@@ -9,22 +9,27 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          submodules: recursive # Automatically fetches vaydns and other missing dependencies
 
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: 'stable'
 
-      - name: Compile CLI Client
+      - name: Prepare and Build
         run: |
-          # Navigate specifically to the command-line client folder
-          cd cmd/cli
+          # 1. Navigate directly to the CLI folder, avoiding mobile constraints
+          cd cli
           
-          # Build the Windows 64-bit binary
-          env GOOS=windows GOARCH=amd64 go build -ldflags "-s -w" -o ../../slipnet.exe .
+          # 2. Create the missing resolvers.txt file that the compiler expects to embed
+          echo "8.8.8.8" > resolvers.txt
+          
+          # 3. Build the Windows executable
+          env GOOS=windows GOARCH=amd64 go build -ldflags "-s -w" -o slipnet.exe .
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: slipnet-windows-binary
-          path: ./slipnet.exe
+          path: ./cli/slipnet.exe
