@@ -1,0 +1,37 @@
+name: Build Windows Executable
+
+on:
+  workflow_dispatch: # Allows you to trigger the build manually whenever you want
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 'stable' # Automatically uses the latest stable Go version
+
+      - name: Compile Windows Binary
+        run: |
+          # The workflow checks if go.mod is in a subfolder or root and builds accordingly
+          if [ -f "go.mod" ]; then
+            env GOOS=windows GOARCH=amd64 go build -ldflags "-s -w" -o slipnet.exe .
+          elif [ -d "cli" ] && [ -f "cli/go.mod" ]; then
+            cd cli
+            env GOOS=windows GOARCH=amd64 go build -ldflags "-s -w" -o ../slipnet.exe .
+          else
+            # Fallback search if the path structure is different
+            MOD_DIR=$(dirname $(find . -name "go.mod" | head -n 1))
+            cd $MOD_DIR
+            env GOOS=windows GOARCH=amd64 go build -ldflags "-s -w" -o ../slipnet.exe .
+          fi
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: slipnet-windows-binary
+          path: ./slipnet.exe
