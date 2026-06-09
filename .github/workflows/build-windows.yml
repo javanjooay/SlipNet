@@ -1,7 +1,7 @@
 name: Build Windows Executable
 
 on:
-  workflow_dispatch: # Allows you to trigger the build manually whenever you want
+  workflow_dispatch:
 
 jobs:
   build:
@@ -13,22 +13,28 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: 'stable' # Automatically uses the latest stable Go version
+          go-version: 'stable'
 
-      - name: Compile Windows Binary
+      - name: Fix Missing Dependencies and Build
         run: |
-          # The workflow checks if go.mod is in a subfolder or root and builds accordingly
-          if [ -f "go.mod" ]; then
-            env GOOS=windows GOARCH=amd64 go build -ldflags "-s -w" -o slipnet.exe .
-          elif [ -d "cli" ] && [ -f "cli/go.mod" ]; then
-            cd cli
-            env GOOS=windows GOARCH=amd64 go build -ldflags "-s -w" -o ../slipnet.exe .
-          else
-            # Fallback search if the path structure is different
-            MOD_DIR=$(dirname $(find . -name "go.mod" | head -n 1))
-            cd $MOD_DIR
-            env GOOS=windows GOARCH=amd64 go build -ldflags "-s -w" -o ../slipnet.exe .
-          fi
+          # 1. Find where go.mod actually is
+          TARGET_DIR=$(dirname $(find . -name "go.mod" | head -n 1))
+          echo "Found go.mod in: $TARGET_DIR"
+          
+          # 2. Fix the missing local 'vaydns' folder relative to the go.mod folder
+          # We create a dummy module structure so the 'replace' directive doesn't break the build
+          PARENT_DIR=$(dirname "$TARGET_DIR")
+          mkdir -p "$PARENT_DIR/vaydns"
+          echo "module github.com/net2share/vaydns" > "$PARENT_DIR/vaydns/go.mod"
+          echo "go 1.21" >> "$PARENT_DIR/vaydns/go.mod"
+          
+          # 3. Create a dummy resolvers.txt file where go.mod is located 
+          # so the //go:embed directive doesn't crash
+          echo "8.8.8.8" > "$TARGET_DIR/resolvers.txt"
+          
+          # 4. Navigate and build
+          cd "$TARGET_DIR"
+          env GOOS=windows GOARCH=amd64 go build -ldflags "-s -w" -o ../../slipnet.exe .
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
